@@ -43,7 +43,7 @@ if uploaded_file is not None:
 
         # Container for search and display
         with st.container():
-            search_query = st.text_input("Search by name", placeholder="e.g., John, Alice")
+            search_query = st.text_input("Search by name", placeholder="enter a volunteer name")
 
             if search_query:
                 filtered_df = completed_leaderboard[completed_leaderboard["ToName"].str.contains(search_query, case=False, na=False)]
@@ -70,7 +70,7 @@ if uploaded_file is not None:
 
         # Container for search and display
         with st.container():
-            search_query_missed = st.text_input("Search by name (missed calls)", placeholder="e.g., John, Alice")
+            search_query_missed = st.text_input("Search by name (missed calls)", placeholder="enter a volunteer name")
 
             if search_query_missed:
                 filtered_missed_df = missed_leaderboard[missed_leaderboard["ToName"].str.contains(search_query_missed, case=False, na=False)]

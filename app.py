@@ -1,89 +1,115 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import streamlit_authenticator as stauth
+import yaml
 
-st.title("📞 Exotel Status Dashboard")
+# Load signing key securely
+signing_key = st.secrets["COOKIE_SIGNING_KEY"]
 
-# Upload file
-uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
+# Define user credentials (or load from a YAML file)
+config = yaml.safe_load(st.secrets["CONFIG_YAML"])
 
-if uploaded_file is not None:
-    df = pd.read_csv(uploaded_file)
+authenticator = stauth.Authenticate(
+    config['credentials'],
+    "exotel_cookie", 
+    signing_key, 
+    cookie_expiry_days=1
+)
 
-    # Check required columns
-    if {"Status", "ToName"}.issubset(df.columns):
-        # Count overall status
-        status_counts = df["Status"].value_counts()
-        col1, col2 = st.columns(2)
-        total_count = status_counts['completed']+status_counts['missed-call']+status_counts['call-attempt']
-        col1.metric("Total Calls Received", f"{total_count}")
-        col2.metric("Number of Calls Completed: ", f"{status_counts['completed']}")
-        col2.metric("Number of Calls Missed: ", f"{status_counts['missed-call']}")
-        col2.metric("Number of Calls Attempted: ", f"{status_counts['call-attempt']}")
-        st.subheader("📊 Overall Call Status Distribution")
-        st.bar_chart(status_counts)
+authenticator.login(location='main')
 
-        st.subheader("Call Status Pie Chart")
-        fig, ax = plt.subplots()
-        ax.pie(status_counts, labels=status_counts.index, autopct='%1.1f%%', startangle=90)
-        ax.axis('equal')
-        st.pyplot(fig)
+if st.session_state.get("authentication_status"):
+    st.sidebar.success(f"Welcome {st.session_state['name']} 👋")
+    authenticator.logout(location='sidebar')
+    st.title("📞 Exotel Status Dashboard")
+    st.write("You are logged in!")
 
-        # Leaderboards
-        st.subheader("🏆 Completed Calls Leaderboard")
+    # Upload file
+    uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
 
-        # Sort and prepare leaderboard data
-        completed_leaderboard = (
-            df[df["Status"] == "completed"]
-            .groupby("ToName")
-            .size()
-            .sort_values(ascending=False)
-            .reset_index(name="Completed Calls")
-        )
+    if uploaded_file is not None:
+        df = pd.read_csv(uploaded_file)
 
-        # Container for search and display
-        with st.container():
-            search_query = st.text_input("Search by name", placeholder="enter a volunteer name")
+        # Check required columns
+        if {"Status", "ToName"}.issubset(df.columns):
+            # Count overall status
+            status_counts = df["Status"].value_counts()
+            col1, col2 = st.columns(2)
+            total_count = status_counts['completed']+status_counts['missed-call']+status_counts['call-attempt']
+            col1.metric("Total Calls Received", f"{total_count}")
+            col2.metric("Number of Calls Completed: ", f"{status_counts['completed']}")
+            col2.metric("Number of Calls Missed: ", f"{status_counts['missed-call']}")
+            col2.metric("Number of Calls Attempted: ", f"{status_counts['call-attempt']}")
+            st.subheader("📊 Overall Call Status Distribution")
+            st.bar_chart(status_counts)
 
-            if search_query:
-                filtered_df = completed_leaderboard[completed_leaderboard["ToName"].str.contains(search_query, case=False, na=False)]
-                st.success(f"Found {len(filtered_df)} matching names")
-            else:
-                filtered_df = completed_leaderboard
+            st.subheader("Call Status Pie Chart")
+            fig, ax = plt.subplots()
+            ax.pie(status_counts, labels=status_counts.index, autopct='%1.1f%%', startangle=90)
+            ax.axis('equal')
+            st.pyplot(fig)
 
-            # Reset index for nice display
-            filtered_df_display = filtered_df.reset_index(drop=True)
-            filtered_df_display.index = filtered_df_display.index + 1
+            # Leaderboards
+            st.subheader("🏆 Completed Calls Leaderboard")
 
-            st.dataframe(filtered_df_display, use_container_width=True)
+            # Sort and prepare leaderboard data
+            completed_leaderboard = (
+                df[df["Status"] == "completed"]
+                .groupby("ToName")
+                .size()
+                .sort_values(ascending=False)
+                .reset_index(name="Completed Calls")
+            )
 
-        st.subheader("📉 Missed Calls Leaderboard")
+            # Container for search and display
+            with st.container():
+                search_query = st.text_input("Search by name", placeholder="enter a volunteer name")
 
-        # Prepare and sort missed calls data
-        missed_leaderboard = (
-            df[df["Status"] == "missed-call"]
-            .groupby("ToName")
-            .size()
-            .sort_values(ascending=False)
-            .reset_index(name="Missed Calls")
-        )
+                if search_query:
+                    filtered_df = completed_leaderboard[completed_leaderboard["ToName"].str.contains(search_query, case=False, na=False)]
+                    st.success(f"Found {len(filtered_df)} matching names")
+                else:
+                    filtered_df = completed_leaderboard
 
-        # Container for search and display
-        with st.container():
-            search_query_missed = st.text_input("Search by name (missed calls)", placeholder="enter a volunteer name")
+                # Reset index for nice display
+                filtered_df_display = filtered_df.reset_index(drop=True)
+                filtered_df_display.index = filtered_df_display.index + 1
 
-            if search_query_missed:
-                filtered_missed_df = missed_leaderboard[missed_leaderboard["ToName"].str.contains(search_query_missed, case=False, na=False)]
-                st.success(f"Found {len(filtered_missed_df)} matching names")
-            else:
-                filtered_missed_df = missed_leaderboard
+                st.dataframe(filtered_df_display, use_container_width=True)
 
-            # Reset and re-index
-            filtered_missed_df_display = filtered_missed_df.reset_index(drop=True)
-            filtered_missed_df_display.index = filtered_missed_df_display.index + 1
+            st.subheader("📉 Missed Calls Leaderboard")
 
-            st.dataframe(filtered_missed_df_display, use_container_width=True)
+            # Prepare and sort missed calls data
+            missed_leaderboard = (
+                df[df["Status"] == "missed-call"]
+                .groupby("ToName")
+                .size()
+                .sort_values(ascending=False)
+                .reset_index(name="Missed Calls")
+            )
+
+            # Container for search and display
+            with st.container():
+                search_query_missed = st.text_input("Search by name (missed calls)", placeholder="enter a volunteer name")
+
+                if search_query_missed:
+                    filtered_missed_df = missed_leaderboard[missed_leaderboard["ToName"].str.contains(search_query_missed, case=False, na=False)]
+                    st.success(f"Found {len(filtered_missed_df)} matching names")
+                else:
+                    filtered_missed_df = missed_leaderboard
+
+                # Reset and re-index
+                filtered_missed_df_display = filtered_missed_df.reset_index(drop=True)
+                filtered_missed_df_display.index = filtered_missed_df_display.index + 1
+
+                st.dataframe(filtered_missed_df_display, use_container_width=True)
 
 
-    else:
-        st.error("The uploaded file must contain 'status' and 'ToName' columns.")
+        else:
+            st.error("The uploaded file must contain 'status' and 'ToName' columns.")
+
+elif st.session_state.get("authentication_status") is False:
+    st.error("Username/password incorrect")
+else:
+    st.warning("Please enter your credentials")

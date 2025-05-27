@@ -1,5 +1,5 @@
 streamlit
 matplotlib
 pandas
-streamlit-authenticator
+streamlit-authenticator>=0.3.0
 yaml
